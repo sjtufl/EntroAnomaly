@@ -1,6 +1,5 @@
 import java.lang._
 import java.util.Properties
-import java.util.Properties
 import scala.io.Source
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.Map
@@ -44,8 +43,10 @@ object entropy {
 		var packetSizeSum = 0
 		var packetNumSum = 0
 
-		//var packetSizeArray:Array[Int] = new Array[Int](10000)
-		//var packetNumArray:Array[Int] = new Array[Int](10000)
+		var packetSizeArray = ArrayBuffer[Int]()
+		var packetNumArray = ArrayBuffer[Int]()
+		//Using timestamp as primary key when write into database
+		val packetTimeArray = ArrayBuffer[String]()
 
 		var entropyDstPort:Array[Double] = new Array[Double](maxNumPerSecond)
 		var entropySrcPort:Array[Double] = new Array[Double](maxNumPerSecond)
@@ -79,8 +80,10 @@ object entropy {
                 strArray.foreach{t => println(t)}
 			}
 			if(strArray(0) != lastTime){
-				//packetSizeArray(index) = packetSizeSum
-				//packetNumArray(index) = packetNumSum
+				packetSizeArray += packetSizeSum
+				packetNumArray += packetNumSum
+				packetTimeArray += lastTime
+
 				entropyDstPort(index) = getEntropy(dstPort, oneWay)
 				entropyDstIp(index) = getEntropy(dstIp, oneWay)
 				entropySrcPort(index) = getEntropy(srcPort, oneWay)
@@ -124,7 +127,6 @@ object entropy {
 
         //PCA
         //1.entropy array to matrix
-        //!!!!! index 
         //var data:Array[Vector[Double]] = new Array[Vector[Double]](maxNumPerSecond)
         var data = ArrayBuffer[Vector]()
         println("[debug] The value of index is " + index)
@@ -137,19 +139,55 @@ object entropy {
         val mat: RowMatrix = new RowMatrix(rows)
         val pc: Matrix = mat.computePrincipalComponents(2)
         val projected: RowMatrix = mat.multiply(pc)
-        val collect = projected.rows.collect()
+        val collect = projected.rows.collect()  //collect Array[Vector]
         println("Projected Row Matrix of principal component:")
-        collect.foreach { vector => println(vector) }
+        collect.foreach{ vector => println(vector) }
 
-        sc.stop()
+        //preparation for writing into database
+        val colArrayArray = collect.map(vector => {
+        	vector.toArray
+        })
+
         //Get anomaly points and write into database. Including 3 parts(time-traffic, time-entropy, time-PCA-2-dimensions and initial data)
-        /*
         val prop = new Properties()
         prop.put("user", "root")
         prop.put("password", "hadoop928")
         prop.put("driver", "com.mysql.jdbc.Driver")
-        val dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-        */
+        val bytesSchema = StructType(List( 
+                                    StructField("bytes_time", StringType, true), 
+                                    StructField("packet_bytes", StringType, true),
+                                    StructField("packet_number", StringType, true)
+                                ))
+        val entropySchema = StructType(List(
+                                    StructField("entropy_time", StringType, true),
+                                    StructField("entropy_srcip", StringType, true),
+                                    StructField("entropy_srcport", StringType, true),
+                                    StructField("entropy_dstport", StringType, true)
+                                ))
+        //packetTimeArray :: packetSizeArray parallelize => RDD 
+        var bytesArray = new ArrayBuffer[Tuple]()
+        for(i <- 0 to packetTimeArray.length){
+            bytesArray += (packetTimeArray(i), packetSizeArray(i), packetNumArray(i))
+        }
+        val bytesRDD = sc.parallelize(bytesArray.toArray)
+        val bytesRowRDD = bytesRDD.map({ case(time, size, num) => 
+            Row(time.toString.trim, size.toString.trim, num.toString.trim)
+        })
+        val bytesDataFrame = sqlContext.createDataFrame(bytesRowRDD, bytesSchema)
+        bytesDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.bytesNumTime", prop)
+
+        var entropyArray = new ArrayBuffer[Tuple]()
+        for(i <- 0 to packetTimeArray.length){
+            entropyArray += (packetTimeArray(i), entropySrcIpPassive(i), entropySrcPortPassive(i), entropyDstPortPassive(i))
+        }
+        val entropyRDD = sc.parallelize(entropyArray.toArray)
+        val entropyRowRDD = entropyRDD.map({ case(time, srcip, srcport, dstport) => 
+            Row(time.toString.trim, srcip.toString.trim, srcport.toString.trim, dstport.toString.trim)
+        })
+        val entropyDataFrame = sqlContext.createDataFrame(entropyRowRDD, entropySchema)
+        entropyDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.entropyTime", prop)
+
+        sc.stop()
 	}
 
     //mutable map problem need to be solved...
@@ -161,16 +199,7 @@ object entropy {
     		theDict(value) = 1
     	}
     }
-/*
-    def processEntropyInt(theDict: Map[Int, Int], value: Int){
-        if(theDict.contains(value)){
-            theDict(value) = theDict.apply(value) + 1
-        }
-        else{
-            theDict(value) = 1
-        }
-    }
-*/
+
     //数据类型需要确定
     def getEntropy(theDict: Map[String, Int], packNum: Int):Double = {
     	var result = 0.0
