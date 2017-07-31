@@ -76,7 +76,7 @@ object entropy {
 			if(first){
 				first = false
 				lastTime = strArray(0)
-                println("[debug] This is first line: ")
+                //println("[debug] This is first line: ")
                 strArray.foreach{t => println(t)}
 			}
 			if(strArray(0) != lastTime){
@@ -132,7 +132,7 @@ object entropy {
         println("[debug] The value of index is " + index)
         for(i <- 0 to index-1)
         {
-            println("[debug] This time value of i is "+ i)
+            //println("[debug] This time value of i is "+ i)
         	data += Vectors.dense(entropySize(i),entropySizePassive(i),entropySrcIpPassive(i),entropySrcPortPassive(i),entropyDstPortPassive(i))
         }
         val rows = sc.parallelize(data)
@@ -140,11 +140,11 @@ object entropy {
         val pc: Matrix = mat.computePrincipalComponents(2)
         val projected: RowMatrix = mat.multiply(pc)
         val collect = projected.rows.collect()  //collect Array[Vector]
-        println("Projected Row Matrix of principal component:")
-        collect.foreach{ vector => println(vector) }
+        //println("Projected Row Matrix of principal component:")
+        //collect.foreach{ vector => println(vector) }
 
         //preparation for writing into database
-        val colArrayArray = collect.map(vector => {
+        val colArray = collect.map(vector => {
         	vector.toArray
         })
 
@@ -164,9 +164,26 @@ object entropy {
                                     StructField("entropy_srcport", StringType, true),
                                     StructField("entropy_dstport", StringType, true)
                                 ))
+        val pcaSchema = StructType(List(
+                                    StructField("pca_time", StringType, true),
+                                    StructField("pca_d1", StringType, true),
+                                    StructField("pca_d2", StringType, true)
+                                ))
+
+        var pcaArray = new ArrayBuffer[Array[String]]()
+        for(i <- 0 to colArray.length-1){
+            pcaArray += Array(packetTimeArray(i), colArray(i).apply(0).toString, colArray(i).apply(1).toString)
+        }
+        val pcaRDD = sc.parallelize(pcaArray)
+        val pcaRowRDD = pcaRDD.map({ case(array) =>
+            Row(array(0).trim, array(1).trim, array(2).trim)
+        })
+        val pcaDataFrame = sqlContext.createDataFrame(pcaRowRDD, pcaSchema)
+        pcaDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.pcaTime", prop)
+
         //packetTimeArray :: packetSizeArray parallelize => RDD 
         var bytesArray = new ArrayBuffer[Array[String]]()
-        for(i <- 0 to packetTimeArray.length){
+        for(i <- 0 to packetTimeArray.length-1){
             bytesArray += Array(packetTimeArray(i), packetSizeArray(i).toString, packetNumArray(i).toString)
         }
         val bytesRDD = sc.parallelize(bytesArray)
@@ -177,12 +194,13 @@ object entropy {
         bytesDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.bytesNumTime", prop)
 
         var entropyArray = new ArrayBuffer[Array[String]]()
-        for(i <- 0 to packetTimeArray.length){
+        for(i <- 0 to packetTimeArray.length-1){
             entropyArray += Array(packetTimeArray(i), entropySrcIpPassive(i).toString, entropySrcPortPassive(i).toString, entropyDstPortPassive(i).toString)
+            //println("[debug] EntropySrcIpPassive["+ i + "] = " + entropySrcIpPassive(i).toString)
         }
         val entropyRDD = sc.parallelize(entropyArray)
         val entropyRowRDD = entropyRDD.map({ case(array) => 
-            Row(array(0).toString.trim, array(1).toString.trim, array(2).toString.trim, array(3).toString.trim)
+            Row(array(0).trim, array(1).trim, array(2).trim, array(3).trim)
         })
         val entropyDataFrame = sqlContext.createDataFrame(entropyRowRDD, entropySchema)
         entropyDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.entropyTime", prop)
