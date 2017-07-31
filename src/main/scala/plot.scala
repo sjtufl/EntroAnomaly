@@ -165,24 +165,24 @@ object entropy {
                                     StructField("entropy_dstport", StringType, true)
                                 ))
         //packetTimeArray :: packetSizeArray parallelize => RDD 
-        var bytesArray = new ArrayBuffer[Tuple]()
+        var bytesArray = new ArrayBuffer[Array[String]]()
         for(i <- 0 to packetTimeArray.length){
-            bytesArray += (packetTimeArray(i), packetSizeArray(i), packetNumArray(i))
+            bytesArray += Array(packetTimeArray(i), packetSizeArray(i).toString, packetNumArray(i).toString)
         }
-        val bytesRDD = sc.parallelize(bytesArray.toArray)
-        val bytesRowRDD = bytesRDD.map({ case(time, size, num) => 
-            Row(time.toString.trim, size.toString.trim, num.toString.trim)
+        val bytesRDD = sc.parallelize(bytesArray)
+        val bytesRowRDD = bytesRDD.map({ case(array) => 
+            Row(array(0).toString.trim, array(1).toString.trim, array(2).toString.trim)
         })
         val bytesDataFrame = sqlContext.createDataFrame(bytesRowRDD, bytesSchema)
         bytesDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.bytesNumTime", prop)
 
-        var entropyArray = new ArrayBuffer[Tuple]()
+        var entropyArray = new ArrayBuffer[Array[String]]()
         for(i <- 0 to packetTimeArray.length){
-            entropyArray += (packetTimeArray(i), entropySrcIpPassive(i), entropySrcPortPassive(i), entropyDstPortPassive(i))
+            entropyArray += Array(packetTimeArray(i), entropySrcIpPassive(i).toString, entropySrcPortPassive(i).toString, entropyDstPortPassive(i).toString)
         }
-        val entropyRDD = sc.parallelize(entropyArray.toArray)
-        val entropyRowRDD = entropyRDD.map({ case(time, srcip, srcport, dstport) => 
-            Row(time.toString.trim, srcip.toString.trim, srcport.toString.trim, dstport.toString.trim)
+        val entropyRDD = sc.parallelize(entropyArray)
+        val entropyRowRDD = entropyRDD.map({ case(array) => 
+            Row(array(0).toString.trim, array(1).toString.trim, array(2).toString.trim, array(3).toString.trim)
         })
         val entropyDataFrame = sqlContext.createDataFrame(entropyRowRDD, entropySchema)
         entropyDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.entropyTime", prop)
