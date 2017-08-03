@@ -17,6 +17,8 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
 
+import util.statis 
+
 object entropy {
 
 	val targetIP:String = "202.121.223.4"
@@ -149,6 +151,9 @@ object entropy {
         val colArray = collect.map(vector => {
         	vector.toArray
         })
+
+        //BEGIN to find anmalous points
+
 
         //Get anomaly points and write into database. Including 3 parts(time-traffic, time-entropy, time-PCA-2-dimensions and initial data)
         val prop = new Properties()

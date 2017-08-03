@@ -1,4 +1,4 @@
-package scala
+package util
 
 import java.lang._
 import scala.io.Source
@@ -11,14 +11,14 @@ import scala.collection.mutable.ArrayBuffer
 
 class statis(data:ArrayBuffer[Array[String]]){
 
-	val pcadata:ArrayBuffer[Array[String]] = data
+    val pcadata:ArrayBuffer[Array[String]] = data
 
     //计算到原点的距离
-	def computeDistance(x:Double, y:Double):Double = {
-		return math.sqrt((x*x) + (y*y))
-	}
+    def computeDistance(x:Double, y:Double):Double = {
+        return math.sqrt((x*x) + (y*y))
+    }
 
-	def getSortedDistanceArray():Array[Array[String]] = {
+    def getSortedDistanceArray():Array[Array[String]] = {
         
         var pcaDistData = pcadata.map({
             case(point) =>
@@ -34,15 +34,14 @@ class statis(data:ArrayBuffer[Array[String]]){
         })
 
         return res.toArray
-	}
+    }
 
-	def _topx(x:Int):Array[Array[String]] = {
-		val sortedArray = getSortedDistanceArray()
-		val res = new ArrayBuffer[Array[String]]()
-		for(i <- 0 to x-1){
-			res += sortedArray.apply(i)
-		}
-		return res.toArray
-	}
-
+    def _topx(x:Int):Array[Array[String]] = {
+        val sortedArray = getSortedDistanceArray()
+        val res = new ArrayBuffer[Array[String]]()
+        for(i <- 0 to x-1){
+            res += sortedArray.apply(i)
+        }
+        return res.toArray
+    }
 }
