@@ -67,12 +67,14 @@ object entropy {
 		var srcPortPassive:Map[String, Int] = new HashMap[String, Int]
 		var sizePassive:Map[String, Int] = new HashMap[String, Int]
 
+		var rawDataArray = ArrayBuffer[Array[String]]() //TO SAVE RAW DATA INTO DATABASE
 
 		//get entropy matrix
 		//val rawData = sc.textFile(filePath)
 		val lines = Source.fromFile(filePath).getLines
 		for(line <- lines){
 			var strArray = line.split('\t')
+			rawDataArray += strArray.foreach(_.trim) //TO SAVE RAW DATA INTO DATABASE
 			if(first){
 				first = false
 				lastTime = strArray(0)
@@ -153,6 +155,7 @@ object entropy {
         prop.put("user", "root")
         prop.put("password", "hadoop928")
         prop.put("driver", "com.mysql.jdbc.Driver")
+        
         val bytesSchema = StructType(List( 
                                     StructField("bytes_time", StringType, true), 
                                     StructField("packet_bytes", StringType, true),
@@ -169,6 +172,22 @@ object entropy {
                                     StructField("pca_d1", StringType, true),
                                     StructField("pca_d2", StringType, true)
                                 ))
+        /*
+        val rawDataSchema = StructType(List( 
+                                    StructField("packet_time", StringType, true), 
+                                    StructField("packet_srcip", StringType, true),
+                                    StructField("packet_dstip", StringType, true),
+                                    StructField("packet_srcport", StringType, true), 
+                                    StructField("packet_dstport", StringType, true), 
+                                    StructField("packet_tcpflag", StringType, true), 
+                                    StructField("packet_bytes", StringType, true)
+                                ))
+        val rawDataRDD = sc.parallelize(rawDataArray)
+        val rawDataRowRDD = rawDataRDD.map({ case(array) =>
+                Row(rray(0).trim, array(1).trim, array(2).trim, rray(3).trim, array(4).trim, array(5).trim, array(6).trim)
+        })
+        val rawDataFrame = sqlContext.createDataFrame(rawDataRowRDD, rawDataSchema)
+        rawDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.rawData", prop)*/
 
         var pcaArray = new ArrayBuffer[Array[String]]()
         for(i <- 0 to colArray.length-1){
