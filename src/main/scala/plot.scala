@@ -153,13 +153,27 @@ object entropy {
         })
 
         //BEGIN to find anmalous points
-
+        val colArrayStat = new ArrayBuffer[Array[String]]()
+        for(i <- 0 to colArray.length-1){
+            colArrayStat += Array(colArray(i).apply(0).toString, colArray(i).apply(1).toString, packetTimeArray(i))
+        }
+        val stat = new statis(colArrayStat.toArray)
+        val top5 = stat._topx(5)
+        top5.foreach(t => 
+                println("[debug] top 5: "+ t.apply(0), t.apply(1), t.apply(2))
+        )
 
         //Get anomaly points and write into database. Including 3 parts(time-traffic, time-entropy, time-PCA-2-dimensions and initial data)
         val prop = new Properties()
         prop.put("user", "root")
         prop.put("password", "hadoop928")
         prop.put("driver", "com.mysql.jdbc.Driver")
+
+        val topxSchema = StructType(List(
+                                    StructField("packet_time", StringType, true), 
+                                    StructField("pca_d1", StringType, true),
+                                    StructField("pca_d2", StringType, true)
+                                ))
         
         val bytesSchema = StructType(List( 
                                     StructField("bytes_time", StringType, true), 
@@ -189,11 +203,20 @@ object entropy {
                                 ))
         val rawDataRDD = sc.parallelize(rawDataArray)
         val rawDataRowRDD = rawDataRDD.map({ case(array) =>
-                Row(rray(0).trim, array(1).trim, array(2).trim, rray(3).trim, array(4).trim, array(5).trim, array(6).trim)
+                Row(array(0).trim, array(1).trim, array(2).trim, rray(3).trim, array(4).trim, array(5).trim, array(6).trim)
         })
         val rawDataFrame = sqlContext.createDataFrame(rawDataRowRDD, rawDataSchema)
         rawDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.rawData", prop)*/
 
+        //write top 5 anomaly data into database
+        val topxRDD = sc.parallelize(top5)
+        val topxRowRDD = topxRDD.map({ case(array) =>
+                Row(array(0).trim, array(1).trim, array(2).trim)
+            })
+        val topxDataFrame = sqlContext.createDataFrame(topxRowRDD, topxSchema)
+        topxDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.topx", prop)
+        
+        //write pca 2 dimensions data into database
         var pcaArray = new ArrayBuffer[Array[String]]()
         for(i <- 0 to colArray.length-1){
             pcaArray += Array(packetTimeArray(i), colArray(i).apply(0).toString, colArray(i).apply(1).toString)
