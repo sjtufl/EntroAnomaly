@@ -74,7 +74,7 @@ object entropy {
 		val lines = Source.fromFile(filePath).getLines
 		for(line <- lines){
 			var strArray = line.split('\t')
-			rawDataArray += strArray.foreach(_.trim) //TO SAVE RAW DATA INTO DATABASE
+			rawDataArray += strArray.map(_.trim) //TO SAVE RAW DATA INTO DATABASE
 			if(first){
 				first = false
 				lastTime = strArray(0)
