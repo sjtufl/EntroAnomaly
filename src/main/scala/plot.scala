@@ -211,11 +211,11 @@ object entropy {
         //write top 5 anomaly data into database
         val topxRDD = sc.parallelize(top5)
         val topxRowRDD = topxRDD.map({ case(array) =>
-                Row(array(0).trim, array(1).trim, array(2).trim)
+                Row(array(2).trim, array(0).trim, array(1).trim)
             })
         val topxDataFrame = sqlContext.createDataFrame(topxRowRDD, topxSchema)
         topxDataFrame.write.mode("append").jdbc("jdbc:mysql://10.255.0.12:3306/entropy", "entropy.topx", prop)
-        
+
         //write pca 2 dimensions data into database
         var pcaArray = new ArrayBuffer[Array[String]]()
         for(i <- 0 to colArray.length-1){
